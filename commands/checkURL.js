@@ -14,7 +14,7 @@ module.exports = {
 		const isAvail = await request(`https://archive.org/wayback/available?url=${url}`);
 		const { archived_snapshots } = await isAvail.body.json();
 		if (Object.keys(archived_snapshots).length == 0)	 {
-			return interaction.reply(`No results found for ${url}. (then autosave url)`) //make ephemeral to match later
+			return interaction.reply(`No results found for ${url}. (then autosave url)`);
 		}
 		//else
 		const row = new ActionRowBuilder()
@@ -29,10 +29,10 @@ module.exports = {
 					.setStyle(ButtonStyle.Secondary),
 			);
 		//return interaction.reply(`The closest snapshot for ${url} is from ${archived_snapshots.closest.timestamp}.`);
-		await interaction.reply({ content: `The closest snapshot for ${url} is from ${archived_snapshots.closest.timestamp}. (button to save new)`, components: [row], ephemeral: true });
+		await interaction.reply({ content: `The closest snapshot for ${url} is from ${archived_snapshots.closest.timestamp}. (button to save new)`, components: [row] });
 		
-		const filter = i => i.isButton() && (i.customId === 'save_new' || i.customId === 'use_latest');
-									//&& (i.user.id === i.message.interaction.user.id); //?
+		const filter = i => i.isButton() && (i.customId === 'save_new' || i.customId === 'use_latest')
+									&& (i.user.id === i.message.interaction.user.id);
 
 		const collector = interaction.channel.createMessageComponentCollector({ filter, time: 10000 });
 
@@ -44,6 +44,7 @@ module.exports = {
 				await interaction.editReply({ content: 'Clicked Use Latest'});
 			}
 		    await interaction.editReply({ components: [] });
+		    //interaction.followUp({ content: 'public message'})
 		    collector.stop();
 		});
 		/*
