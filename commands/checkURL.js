@@ -1,6 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, SlashCommandBuilder } = require('discord.js');
 const { request } = require('undici');
-//...?
+const headers = require('../headers.json');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -14,7 +14,27 @@ module.exports = {
 		const isAvail = await request(`https://archive.org/wayback/available?url=${url}`);
 		const { archived_snapshots } = await isAvail.body.json();
 		if (Object.keys(archived_snapshots).length == 0)	 {
-			return interaction.reply(`No results found for ${url}. (then autosave url)`);
+			await interaction.reply(`No results found for ${url}. Testing SPN API...`);
+
+			const options = {
+				path: '/',
+				method: 'POST',
+				headers: new Headers(headers),
+				body: `url=${encodeURIComponent('http://example.com')}`,
+			}
+			console.log(headers)
+			//const client = new Client('https://web.archive.org/save/');
+
+			try {
+				await fetch('https://web.archive.org/save/', options)
+				.then(res => res.json())
+				.then(res => console.log(res))
+				.catch((error) => console.error("Error:",error));
+				console.log("ok");
+			} catch (error) {
+				console.error(error);
+			}
+			return interaction.editReply("end here");
 		}
 		//else
 		const row = new ActionRowBuilder()
@@ -29,7 +49,7 @@ module.exports = {
 					.setStyle(ButtonStyle.Secondary),
 			);
 		//return interaction.reply(`The closest snapshot for ${url} is from ${archived_snapshots.closest.timestamp}.`);
-		await interaction.reply({ content: `The closest snapshot for ${url} is from ${archived_snapshots.closest.timestamp}. (button to save new)`, components: [row] });
+		await interaction.reply({ content: `The closest snapshot for ${url} is from ${archived_snapshots.closest.timestamp}.`, components: [row] });
 		
 		const filter = i => i.isButton() && (i.customId === 'save_new' || i.customId === 'use_latest')
 									&& (i.user.id === i.message.interaction.user.id);
@@ -47,14 +67,6 @@ module.exports = {
 		    //interaction.followUp({ content: 'public message'})
 		    collector.stop();
 		});
-		/*
-		collector_use_latest.on('collect', async i => {
-		    await i.deferUpdate();
-		    await interaction.editReply('Clicked Use Latest');
-		    await interaction.editReply({ components: [] });
-		    collector_use_latest.stop();
-		});
-		*/
 
 	},
 };
