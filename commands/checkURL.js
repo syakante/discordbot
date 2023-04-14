@@ -1,6 +1,7 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, SlashCommandBuilder } = require('discord.js');
-const { request } = require('undici');
-const headers = require('../headers.json');
+//const { request } = require('undici');
+const myHeader = require('../headers.json');
+const headers = new Headers(myHeader);
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -11,28 +12,61 @@ module.exports = {
 			.setRequired(true)),
 	async execute(interaction) {
 		const url = interaction.options.getString('url');
-		const isAvail = await request(`https://archive.org/wayback/available?url=${url}`);
-		const { archived_snapshots } = await isAvail.body.json();
+		
+		const isAvail = await fetch(`https://archive.org/wayback/available?url=${url}`);
+		const { archived_snapshots } = await isAvail.json();
+
 		if (Object.keys(archived_snapshots).length == 0)	 {
-			await interaction.reply(`No results found for ${url}. Testing SPN API...`);
+			
+			await interaction.reply(`No results found for ${url}. Saving to Wayback Machine...`);
 
 			const options = {
 				path: '/',
 				method: 'POST',
-				headers: new Headers(headers),
-				body: `url=${encodeURIComponent('http://example.com')}`,
+				headers,
+				body: `url=${encodeURIComponent(url)}`,
 			}
-			console.log(headers)
-			//const client = new Client('https://web.archive.org/save/');
 
 			try {
-				await fetch('https://web.archive.org/save/', options)
-				.then(res => res.json())
-				.then(res => console.log(res))
-				.catch((error) => console.error("Error:",error));
+				//POSTing to SPN
+				const saveResponse = await fetch('https://web.archive.org/save/', options);
+				//get back url and job_id
+				const { job_id } = await saveResponse.json();
+
+				//VVV TODO VVV
+
+				//syntax for checking status:
+				//https://web.archive.org/save/status/job_id
+				//Response json, but we only care about the status part of it
+				//const { status } = await request(`https://web.archive.org/save/status/${job_id}`);
+				/* what i want to do is check the status. if pending, sleep and check later; if error, smth wrong wtf
+				 * and check until timeout amount (what should that amount be?)
+				 * ok "expired" job_ids just give pending I guess but timeout should handle that...?
+				*/
+				const myTimeoutLength = 5000;
+				
+				try {
+					//Checking status
+					const { status } = await fetch(`https://web.archive.org/save/status/${job_id}`, { signal: AbortSignal.timeout(myTimeoutLength)});
+					console.log("ok");
+					console.log(status);
+				} catch (err) {
+					if (err.name === "TimeoutError") {
+						console.error("Timeout: It took too long to get the result!");
+					} else if (err.name === "AbortError") {
+						console.error("Fetch aborted by user action.");
+					} else if (err.name === "TypeError") {
+						console.error("AbortSignal.timeout() method is not supported.");
+					} else {
+						console.error(`Error: type ${err.name}, message:${err.message}`);
+					}
+					return interaction.editReply("Something went wrong. See console error.");
+				}
+
+
 				console.log("ok");
-			} catch (error) {
-				console.error(error);
+			} catch (err) {
+				console.error(err);
 			}
 			return interaction.editReply("end here");
 		}
