@@ -3,7 +3,9 @@ const myHeader = require('../headers.json');
 const headers = new Headers(myHeader);
 const { TwitterApi } = require('twitter-api-v2');
 const client = new TwitterApi('bearer token placeholder');
-//obviously... do not push that ^
+
+const intspan = require('../intspan.js');
+
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -17,17 +19,58 @@ module.exports = {
 		.addStringOption(option =>
 			option
 				.setName('notes')
-				.setDescription('Your own optional tags or notes')),
+				.setDescription('Your own optional tags or notes'))
+		.addStringOption(option =>
+			option
+			.setName('spoiler')
+			.setDescription('Which of up to 4 images to spoiler, if any. e.g. 1-3, 4. Default: none'))
+		.addStringOption(option =>
+			option
+			.setName('which')
+			.setDescription('Select which images to upload e.g. 1-3, 4. Default: all (except videos)')),
 	
 	async execute(interaction) {
 		let url = interaction.options.getString('url');
 		let notes = interaction.options.getString('notes') ?? '';
+		let spoilerInd = interaction.options.getString('spoiler') ?? '';
+		let whichInd = interaction.options.getString('spoiler') ?? '';
+		
+		spoilerInd = spoilerInd.replace(/\s+/g, '');
+		whichInd = whichInd.replace(/\s+/g, '');
 
-		const options = {
-			path: '/',
-			method: 'POST',
-			headers,
-			body: `url=${encodeURIComponent(url)}&skip_first_archive=1&js_behavior_timeout=0&capture_outlinks=0`,
+		//if you attempt to spoiler images that you chose to omit e.g. spoiler 2, only upload 1,3
+		//then just ignore the spoiler and upload the requested images
+		let spoilerArr = [];
+		let spoilerStrArr = [];
+		if (spoilerInd.length > 0) {
+			try {
+				spoilerArr = intspan(spoilerInd); //<-- list of int indeces
+				if (spoilerArr[0] < 1 || spoilerArr[spoilerArr.length] > 4) {
+					return interaction.reply(`Out of range on spoiler option.`)
+				}
+			} catch (e) {
+				return interaction.reply(`${e} on spoiler option.`);
+			}
+			for (let i = 1; i <= 4; i++) {
+				if (spoilerArr.includes(i)) {
+					spoilerStrArr.push("SPOILER_");
+				} else {
+					spoilerStrArr.push("");
+				}
+			}
+		} else {
+			spoilerStrArr = ["", "", "", ""];
+		}
+		let whichArr = [1, 2, 3, 4];
+		if (whichInd.length > 0) {
+			try {
+				whichArr = intspan(whichInd); //<-- list if int indeces
+				if (whichArr[0] < 1 || whichArr[whichArr.length] > 4) {
+					return interaction.reply(`Out of range on which option.`)
+				}
+			} catch (e) {
+				return interaction.reply(`${e} on which option.`);
+			}
 		}
 
 		const twtPattern = /https?:\/\/(www\.|mobile\.)?twitter\.com\/\w+\/status\/(?<id>\d+)/;
@@ -51,7 +94,7 @@ module.exports = {
 		console.log(JSON.stringify(thisTweet));
 
 		if (thisTweet.errors){
-			return interaction.reply({content: `${url} error: ${thisTweet.errors[0].title}!`}) //considering ephemeral: true here?
+			return interaction.reply({content: `${url} error: ${thisTweet.errors[0].title}!`})
 		}
 		if (!thisTweet.includes.media){
 			return interaction.reply(`Couldn't find any images in ${hideLinkEmbed(url)}.`)
@@ -59,30 +102,39 @@ module.exports = {
 		//thisTweet.includes.media = an array of objects, length depends on how many media attachments
 		//for each object in the array we want "url"
 		//so like thisTweet.includes.media[i].url
-		let mediaUrlArr = await thisTweet.includes.media.map(({ url }) => url);
+		let mediaUrlArr = thisTweet.includes.media.map(({ url }) => url);
 		//case: length of media > number of url. Specifically this happens if there's a gif/video attachment.
 		//in this case, let the user know, and just upload the files that have URLs.
-		if (mediaUrlArr.every(i => i === undefined)){
-			return interaction.reply(`Can't reupload video(s) in ${hideLinkEmbed(url)}.`)
-			//note that the user might know this and just want to archive a link to a video
-			//so instead of return, skip to the part where you archive it
-			//...later
-			//potentially change flow here so instead of checking .every and then .some,
-			//only check .some and then check if array empty after that
-		}
+
 		let hasVideo = false;
-		if (mediaUrlArr.some(i => i === undefined)){
-			mediaUrlArr = mediaUrlArr.filter(url => url !== undefined);
+		whichArr = whichArr.filter(x => x <= mediaUrlArr.length)
+		mediaUrlArr = mediaUrlArr.filter((_, i) => whichArr.includes(i));
+		spoilerStrArr = spoilerStrArr.filter((_, i) => whichArr.includes(i));
+		const isVideoInd = mediaUrlArr.reduce((acc, cur, i) => {
+			if (cur === undefined) {
+				acc.push(i);
+			}
+			return acc;
+		}, []);
+		
+		if (isVideoInd.length > 0) {
 			hasVideo = true;
 		}
+
+		mediaUrlArr = mediaUrlArr.filter((_, i) => !isVideoInd.includes(i));
+		if (mediaUrlArr.length == 0) {
+			return interaction.reply(`Can't reupload video(s) in ${hideLinkEmbed(url)}.`)
+		}
+		spoilerStrArr = spoilerStrArr.filter((_, i) => !isVideoInd.includes(i));
 		const tweetUser = thisTweet.includes.users[0].username;
 		const displayName = thisTweet.includes.users[0].name;
 		let tweetDescr = thisTweet.data.text;
 
+
+		//Removing redundant t.co links
 		const tcoInd = [...tweetDescr.matchAll(new RegExp(/https:\/\/t.co\/\w+/g))].map(a => a.index);
 		//if has video, remove the last two t.co
 		//if no video, remove the last t.co
-		//it's that easy! Except JS doesn't have negative indexing
 		//they'll always be at the end of text so you can just slice off everything in the string after the nth t.co
 		const tcoSlice = tcoInd[tcoInd.length-1-hasVideo];
 		if(tcoSlice == 0){
@@ -93,7 +145,7 @@ module.exports = {
 
 		console.log(mediaUrlArr);
 		
-		const fileArr = mediaUrlArr.map((s, i) => ({name: `${tweetUser}_${i}.${s.match(/([^.]*$)/)[0]}`, attachment: s}))
+		const fileArr = mediaUrlArr.map((s, i) => ({name: `${spoilerStrArr[i]}${tweetUser}_${i}.${s.match(/([^.]*$)/)[0]}`, attachment: s}))
 		//with multiple files it would look someting like this
 		/*
 		*	files: [{name: filename1, attachment: path1}, {name: filename2, attachment: path2}]
@@ -127,6 +179,15 @@ module.exports = {
 
 		return interaction.reply({ embeds: [tweetEmbed],
 									files: fileArr});
+
+
+		const options = {
+			path: '/',
+			method: 'POST',
+			headers,
+			body: `url=${encodeURIComponent(url)}&skip_first_archive=1&js_behavior_timeout=0&capture_outlinks=0`,
+		}
+
 		try {
 				//POSTing to SPN
 				const saveResponse = await fetch('https://web.archive.org/save/', options);
