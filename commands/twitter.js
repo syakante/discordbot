@@ -92,7 +92,6 @@ module.exports = {
 		});
 
 		//console.log(JSON.stringify(thisTweet));
-		const twtDate = new Date(thisTweet.data.created_at);
 
 		if (thisTweet.errors){
 			return interaction.editReply({content: `${url} error: ${thisTweet.errors[0].title}!`})
@@ -100,6 +99,7 @@ module.exports = {
 		if (!thisTweet.includes.media){
 			return interaction.editReply(`Couldn't find any images in ${hideLinkEmbed(url)}.`)
 		}
+		const twtDate = new Date(thisTweet.data.created_at);
 		//thisTweet.includes.media = an array of objects, length depends on how many media attachments
 		//for each object in the array we want "url"
 		//so like thisTweet.includes.media[i].url
