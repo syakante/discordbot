@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "argparse": "^2.0.1",
     "discord": "^0.8.2",
     "discord.js": "^14.9.0",
     "twitter-api-v2": "^1.14.2",
