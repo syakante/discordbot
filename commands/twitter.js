@@ -2,15 +2,13 @@ const { hideLinkEmbed, SlashCommandBuilder } = require('discord.js');
 const myHeader = require('../headers.json');
 const headers = new Headers(myHeader);
 const { TwitterApi } = require('twitter-api-v2');
-const client = new TwitterApi('bearer token placeholder');
-
+const client = new TwitterApi(require('../twt.json').bearer);
 const intspan = require('../intspan.js');
-
 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('twt')
-		.setDescription('Save a Twitter URL to the Wayback Machine and reupload the tweet\'s images to this channel.')
+		.setDescription('Reupload a tweet\'s images to this channel.')
 		.addStringOption(option =>
 			option
 				.setName('url')
@@ -23,17 +21,18 @@ module.exports = {
 		.addStringOption(option =>
 			option
 			.setName('spoiler')
-			.setDescription('Which of up to 4 images to spoiler, if any. e.g. 1-3, 4. Default: none'))
+			.setDescription('Which of up to 4 images to spoiler, if any. e.g. 1-3, 4. Default: none. WORK IN PROGRESS :('))
 		.addStringOption(option =>
 			option
 			.setName('which')
 			.setDescription('Select which images to upload e.g. 1-3, 4. Default: all (except videos)')),
 	
 	async execute(interaction) {
+		await interaction.deferReply();
 		let url = interaction.options.getString('url');
 		let notes = interaction.options.getString('notes') ?? '';
 		let spoilerInd = interaction.options.getString('spoiler') ?? '';
-		let whichInd = interaction.options.getString('spoiler') ?? '';
+		let whichInd = interaction.options.getString('which') ?? '';
 		
 		spoilerInd = spoilerInd.replace(/\s+/g, '');
 		whichInd = whichInd.replace(/\s+/g, '');
@@ -46,30 +45,30 @@ module.exports = {
 			try {
 				spoilerArr = intspan(spoilerInd); //<-- list of int indeces
 				if (spoilerArr[0] < 1 || spoilerArr[spoilerArr.length] > 4) {
-					return interaction.reply(`Out of range on spoiler option.`)
+					return interaction.editReply(`Out of range on spoiler option.`)
 				}
 			} catch (e) {
-				return interaction.reply(`${e} on spoiler option.`);
+				return interaction.editReply(`${e} on spoiler option.`);
 			}
 			for (let i = 1; i <= 4; i++) {
 				if (spoilerArr.includes(i)) {
-					spoilerStrArr.push("SPOILER_");
+					spoilerStrArr.push('SPOILER_');
 				} else {
-					spoilerStrArr.push("");
+					spoilerStrArr.push('');
 				}
 			}
 		} else {
-			spoilerStrArr = ["", "", "", ""];
+			spoilerStrArr = ['', '', '', ''];
 		}
-		let whichArr = [1, 2, 3, 4];
+		let whichArr = [0, 1, 2, 3];
 		if (whichInd.length > 0) {
 			try {
-				whichArr = intspan(whichInd); //<-- list if int indeces
-				if (whichArr[0] < 1 || whichArr[whichArr.length] > 4) {
-					return interaction.reply(`Out of range on which option.`)
+				whichArr = intspan(whichInd).map( x => x-1); //cuz 0 indexing
+				if (whichArr[0] < 0 || whichArr[whichArr.length] > 3) {
+					return interaction.editReply(`Out of range on which option.`)
 				}
 			} catch (e) {
-				return interaction.reply(`${e} on which option.`);
+				return interaction.editReply(`${e} on which option.`);
 			}
 		}
 
@@ -77,7 +76,7 @@ module.exports = {
 		const match = url.match(twtPattern);
 		//console.log(match);
 		if (!match){
-			return interaction.reply(`${hideLinkEmbed(url)} is not a valid Twitter link.`);
+			return interaction.editReply(`${hideLinkEmbed(url)} is not a valid Twitter link.`);
 		}
 
 		url = match[0]; //a little sus but I'll go with it
@@ -91,13 +90,13 @@ module.exports = {
 			]
 		});
 
-		console.log(JSON.stringify(thisTweet));
+		//console.log(JSON.stringify(thisTweet));
 
 		if (thisTweet.errors){
-			return interaction.reply({content: `${url} error: ${thisTweet.errors[0].title}!`})
+			return interaction.editReply({content: `${url} error: ${thisTweet.errors[0].title}!`})
 		}
 		if (!thisTweet.includes.media){
-			return interaction.reply(`Couldn't find any images in ${hideLinkEmbed(url)}.`)
+			return interaction.editReply(`Couldn't find any images in ${hideLinkEmbed(url)}.`)
 		}
 		//thisTweet.includes.media = an array of objects, length depends on how many media attachments
 		//for each object in the array we want "url"
@@ -123,7 +122,11 @@ module.exports = {
 
 		mediaUrlArr = mediaUrlArr.filter((_, i) => !isVideoInd.includes(i));
 		if (mediaUrlArr.length == 0) {
-			return interaction.reply(`Can't reupload video(s) in ${hideLinkEmbed(url)}.`)
+			if (hasVideo) {
+				return interaction.editReply(`Can't reupload video(s) in ${hideLinkEmbed(url)}.`)
+			} else {
+				return interaction.editReply(`Something went wrong.`)
+			}
 		}
 		spoilerStrArr = spoilerStrArr.filter((_, i) => !isVideoInd.includes(i));
 		const tweetUser = thisTweet.includes.users[0].username;
@@ -143,14 +146,14 @@ module.exports = {
 			tweetDescr = tweetDescr.slice(0, tcoSlice-1);
 		}
 
-		console.log(mediaUrlArr);
+		//console.log(mediaUrlArr);
 		
 		const fileArr = mediaUrlArr.map((s, i) => ({name: `${spoilerStrArr[i]}${tweetUser}_${i}.${s.match(/([^.]*$)/)[0]}`, attachment: s}))
 		//with multiple files it would look someting like this
 		/*
 		*	files: [{name: filename1, attachment: path1}, {name: filename2, attachment: path2}]
 		*/
-		console.log(fileArr);
+		//console.log(fileArr);
 
 		const tweetEmbed = {
 			color: 0x1DA1F2,
@@ -177,59 +180,7 @@ module.exports = {
 			})
 		}
 
-		return interaction.reply({ embeds: [tweetEmbed],
+		return interaction.editReply({ embeds: [tweetEmbed],
 									files: fileArr});
-
-
-		const options = {
-			path: '/',
-			method: 'POST',
-			headers,
-			body: `url=${encodeURIComponent(url)}&skip_first_archive=1&js_behavior_timeout=0&capture_outlinks=0`,
-		}
-
-		try {
-				//POSTing to SPN
-				const saveResponse = await fetch('https://web.archive.org/save/', options);
-				//get back url and job_id
-				const { job_id } = await saveResponse.json();
-
-				//VVV TODO VVV
-
-				//syntax for checking status:
-				//https://web.archive.org/save/status/job_id
-				//Response json, but we only care about the status part of it
-				//const { status } = await request(`https://web.archive.org/save/status/${job_id}`);
-				/* what i want to do is check the status. if pending, sleep and check later; if error, smth wrong wtf
-				 * and check until timeout amount (what should that amount be?)
-				 * ok "expired" job_ids just give pending I guess but timeout should handle that...?
-				 * I think this should be handled by promises and stuff
-				 * and SPN  already has a builtin max capture time of 50s
-				*/
-				const myTimeoutLength = 5000;
-				
-				try {
-					//Checking status
-					const { status } = await fetch(`https://web.archive.org/save/status/${job_id}`, { signal: AbortSignal.timeout(myTimeoutLength)});
-					console.log("ok");
-					console.log(status);
-				} catch (err) {
-					if (err.name === "TimeoutError") {
-						console.error("Timeout: It took too long to get the result!");
-					} else if (err.name === "AbortError") {
-						console.error("Fetch aborted by user action.");
-					} else if (err.name === "TypeError") {
-						console.error("AbortSignal.timeout() method is not supported.");
-					} else {
-						console.error(`Error: type ${err.name}, message:${err.message}`);
-					}
-					return interaction.editReply("Something went wrong. See console error.");
-				}
-
-				console.log("ok");
-			} catch (err) {
-				console.error(err);
-			}
-			return interaction.editReply("end here");
 		}
 }

@@ -1,4 +1,7 @@
-config.json
+config_dev.json
+config_rel.json
+twt.json
 headers.json
 node_modules/
 stuff.txt
+tmp.js
