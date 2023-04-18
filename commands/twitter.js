@@ -3,9 +3,12 @@ const myHeader = require('../headers.json');
 const headers = new Headers(myHeader);
 const { TwitterApi } = require('twitter-api-v2');
 const client = new TwitterApi('bearer token placeholder');
-
+//
 const intspan = require('../intspan.js');
 
+//TODO: add defer
+//TODO: github on the rpi
+//TODO: global commands
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -32,17 +35,17 @@ module.exports = {
 	async execute(interaction) {
 		let url = interaction.options.getString('url');
 		let notes = interaction.options.getString('notes') ?? '';
-		let spoilerInd = interaction.options.getString('spoiler') ?? '';
-		let whichInd = interaction.options.getString('spoiler') ?? '';
+		let spoilerInd = interaction.options.getString('spoiler');
+		let whichInd = interaction.options.getString('which');
 		
-		spoilerInd = spoilerInd.replace(/\s+/g, '');
-		whichInd = whichInd.replace(/\s+/g, '');
-
 		//if you attempt to spoiler images that you chose to omit e.g. spoiler 2, only upload 1,3
 		//then just ignore the spoiler and upload the requested images
+
+		//V I moved around a bunch of stuff while debugging so double check later
 		let spoilerArr = [];
 		let spoilerStrArr = [];
-		if (spoilerInd.length > 0) {
+		if (spoilerInd) {
+			spoilerInd = spoilerInd.replace(/\s+/g, '');
 			try {
 				spoilerArr = intspan(spoilerInd); //<-- list of int indeces
 				if (spoilerArr[0] < 1 || spoilerArr[spoilerArr.length] > 4) {
@@ -62,7 +65,8 @@ module.exports = {
 			spoilerStrArr = ["", "", "", ""];
 		}
 		let whichArr = [1, 2, 3, 4];
-		if (whichInd.length > 0) {
+		if (whichInd) {
+			whichInd = whichInd.replace(/\s+/g, '');
 			try {
 				whichArr = intspan(whichInd); //<-- list if int indeces
 				if (whichArr[0] < 1 || whichArr[whichArr.length] > 4) {
@@ -72,10 +76,8 @@ module.exports = {
 				return interaction.reply(`${e} on which option.`);
 			}
 		}
-
 		const twtPattern = /https?:\/\/(www\.|mobile\.)?twitter\.com\/\w+\/status\/(?<id>\d+)/;
 		const match = url.match(twtPattern);
-		//console.log(match);
 		if (!match){
 			return interaction.reply(`${hideLinkEmbed(url)} is not a valid Twitter link.`);
 		}
@@ -131,6 +133,7 @@ module.exports = {
 		let tweetDescr = thisTweet.data.text;
 
 
+
 		//Removing redundant t.co links
 		const tcoInd = [...tweetDescr.matchAll(new RegExp(/https:\/\/t.co\/\w+/g))].map(a => a.index);
 		//if has video, remove the last two t.co
@@ -144,6 +147,7 @@ module.exports = {
 		}
 
 		console.log(mediaUrlArr);
+		
 		
 		const fileArr = mediaUrlArr.map((s, i) => ({name: `${spoilerStrArr[i]}${tweetUser}_${i}.${s.match(/([^.]*$)/)[0]}`, attachment: s}))
 		//with multiple files it would look someting like this
@@ -179,57 +183,5 @@ module.exports = {
 
 		return interaction.reply({ embeds: [tweetEmbed],
 									files: fileArr});
-
-
-		const options = {
-			path: '/',
-			method: 'POST',
-			headers,
-			body: `url=${encodeURIComponent(url)}&skip_first_archive=1&js_behavior_timeout=0&capture_outlinks=0`,
-		}
-
-		try {
-				//POSTing to SPN
-				const saveResponse = await fetch('https://web.archive.org/save/', options);
-				//get back url and job_id
-				const { job_id } = await saveResponse.json();
-
-				//VVV TODO VVV
-
-				//syntax for checking status:
-				//https://web.archive.org/save/status/job_id
-				//Response json, but we only care about the status part of it
-				//const { status } = await request(`https://web.archive.org/save/status/${job_id}`);
-				/* what i want to do is check the status. if pending, sleep and check later; if error, smth wrong wtf
-				 * and check until timeout amount (what should that amount be?)
-				 * ok "expired" job_ids just give pending I guess but timeout should handle that...?
-				 * I think this should be handled by promises and stuff
-				 * and SPN  already has a builtin max capture time of 50s
-				*/
-				const myTimeoutLength = 5000;
-				
-				try {
-					//Checking status
-					const { status } = await fetch(`https://web.archive.org/save/status/${job_id}`, { signal: AbortSignal.timeout(myTimeoutLength)});
-					console.log("ok");
-					console.log(status);
-				} catch (err) {
-					if (err.name === "TimeoutError") {
-						console.error("Timeout: It took too long to get the result!");
-					} else if (err.name === "AbortError") {
-						console.error("Fetch aborted by user action.");
-					} else if (err.name === "TypeError") {
-						console.error("AbortSignal.timeout() method is not supported.");
-					} else {
-						console.error(`Error: type ${err.name}, message:${err.message}`);
-					}
-					return interaction.editReply("Something went wrong. See console error.");
-				}
-
-				console.log("ok");
-			} catch (err) {
-				console.error(err);
-			}
-			return interaction.editReply("end here");
-		}
+	}
 }
