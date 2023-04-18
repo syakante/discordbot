@@ -82,6 +82,7 @@ module.exports = {
 		url = match[0]; //a little sus but I'll go with it
 
 		const thisTweet = await client.v2.singleTweet(match.groups.id, {
+			'tweet.fields': 'created_at',
 			'media.fields': 'url',
 			'user.fields': 'username',
 			expansions: [
@@ -91,6 +92,7 @@ module.exports = {
 		});
 
 		//console.log(JSON.stringify(thisTweet));
+		const twtDate = new Date(thisTweet.data.created_at);
 
 		if (thisTweet.errors){
 			return interaction.editReply({content: `${url} error: ${thisTweet.errors[0].title}!`})
@@ -164,6 +166,7 @@ module.exports = {
 			},
 			description: tweetDescr,
 			fields: [],
+			timestamp: twtDate.toISOString(),
 			//in the future, maybe add timestamp. See field in the twitter API docs.
 		}
 		
