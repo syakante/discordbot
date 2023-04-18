@@ -2,7 +2,7 @@ const { hideLinkEmbed, SlashCommandBuilder } = require('discord.js');
 const myHeader = require('../headers.json');
 const headers = new Headers(myHeader);
 const { TwitterApi } = require('twitter-api-v2');
-const client = new TwitterApi('bearer token');
+const client = new TwitterApi(require('../twt.json').bearer);
 const intspan = require('../intspan.js');
 
 module.exports = {
@@ -52,19 +52,19 @@ module.exports = {
 			}
 			for (let i = 1; i <= 4; i++) {
 				if (spoilerArr.includes(i)) {
-					spoilerStrArr.push("SPOILER_");
+					spoilerStrArr.push('SPOILER_');
 				} else {
-					spoilerStrArr.push("");
+					spoilerStrArr.push('');
 				}
 			}
 		} else {
-			spoilerStrArr = ["", "", "", ""];
+			spoilerStrArr = ['', '', '', ''];
 		}
-		let whichArr = [1, 2, 3, 4];
+		let whichArr = [0, 1, 2, 3];
 		if (whichInd.length > 0) {
 			try {
-				whichArr = intspan(whichInd); //<-- list if int indeces
-				if (whichArr[0] < 1 || whichArr[whichArr.length] > 4) {
+				whichArr = intspan(whichInd).map( x => x-1); //cuz 0 indexing
+				if (whichArr[0] < 0 || whichArr[whichArr.length] > 3) {
 					return interaction.editReply(`Out of range on which option.`)
 				}
 			} catch (e) {
@@ -122,7 +122,11 @@ module.exports = {
 
 		mediaUrlArr = mediaUrlArr.filter((_, i) => !isVideoInd.includes(i));
 		if (mediaUrlArr.length == 0) {
-			return interaction.editReply(`Can't reupload video(s) in ${hideLinkEmbed(url)}.`)
+			if (hasVideo) {
+				return interaction.editReply(`Can't reupload video(s) in ${hideLinkEmbed(url)}.`)
+			} else {
+				return interaction.editReply(`Something went wrong.`)
+			}
 		}
 		spoilerStrArr = spoilerStrArr.filter((_, i) => !isVideoInd.includes(i));
 		const tweetUser = thisTweet.includes.users[0].username;

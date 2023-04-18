@@ -3,7 +3,21 @@ const path = require('node:path');
 //const { request } = require('undici');
 // Require the necessary discord.js classes
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
-const { token } = require('./config.json');
+const { ArgumentParser } = require('argparse');
+const parser = new ArgumentParser({description: 'dev(elopment) or rel(ease) build'});
+parser.add_argument('build', { metavar: 'b', type: 'str', default: 'dev'});
+let args = parser.parse_args();
+const build = args.build;
+
+let token;
+if (build == 'dev') {
+	token = require('./config_dev.json').token;
+} else if (build == 'rel') {
+	token = require('./config_rel.json').token;
+} else {
+	console.error("bad argument");
+	return;
+}
 
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
