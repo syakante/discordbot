@@ -21,7 +21,7 @@ module.exports = {
 		.addStringOption(option =>
 			option
 			.setName('spoiler')
-			.setDescription('Which of up to 4 images to spoiler, if any. e.g. 1-3, 4. Default: none. WORK IN PROGRESS :('))
+			.setDescription('Which of up to 4 images to spoiler, if any. e.g. 1-3, 4. Default: none'))
 		.addStringOption(option =>
 			option
 			.setName('which')
