@@ -149,8 +149,10 @@ module.exports = {
 		}
 
 		//console.log(mediaUrlArr);
-		
-		const fileArr = mediaUrlArr.map((s, i) => ({name: `${spoilerStrArr[i]}${tweetUser}_${i}.${s.match(/([^.]*$)/)[0]}`, attachment: s}))
+		//well what I want to do is make the filename just the username if it's only one image
+		//so the default filename for single image isn't stuff_0 which might be confusing
+		const fileArr = ((mediaUrlArr.length > 1) ? mediaUrlArr.map((s, i) => ({name: `${spoilerStrArr[i]}${tweetUser}-${i}.${s.match(/([^.]*$)/)[0]}`, attachment: s})) : [{name: `${spoilerStrArr[0]}${tweetUser}.${mediaUrlArr[0].match(/([^.]*$)/)[0]}`, attachment: mediaUrlArr[0]}])
+
 		//with multiple files it would look someting like this
 		/*
 		*	files: [{name: filename1, attachment: path1}, {name: filename2, attachment: path2}]
